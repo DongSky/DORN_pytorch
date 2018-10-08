@@ -63,12 +63,18 @@ class DenseFeatureExtractor(nn.Module):
         self.conv1_3 = nn.Conv2d(64, 128, 3, stride=1, padding=1)
         self.bn1_3 = nn.BatchNorm2d(128)
         self.pooling1 = nn.MaxPool2d(3, stride=2, padding=1)
-        
+        self.blockcolle1 = ResBlockCollection(input_channel=128, channel_list=[64, 64, 256], block_num=3)
+        self.blockcolle2 = ResBlockCollection(input_channel=256, channel_list=[128, 128, 512], block_num=4)
+        self.blockcolle3 = ResBlockCollection(input_channel=512, channel_list=[256, 256, 1024], block_num=23)
+        self.blockcolle4 = ResBlockCollection(input_channel=1024, channel_list=[512, 512, 2048], block_num=3)
+
 
 
 class DORN(nn.Module):
-    def __init__(self, width, height):
+    def __init__(self, width, height, channel):
         super(DORN, self).__init__()
         self.width = width
         self.height = height
+        self.channel = channel
+        self.feature_extractor = DenseFeatureExtractor(self.channel)
 
