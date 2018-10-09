@@ -131,7 +131,8 @@ class SceneUnderstandingModule(nn.Module):
             nn.Conv2d(512*5, 2048, 1),
             nn.ReLU(inplace=True),
             nn.Dropout2d(p=0.5),
-            nn.Conv2d(2048, 142, 1)
+            nn.Conv2d(2048, 142, 1),
+            nn.UpsamplingBilinear2d(scale_factor=8)
         )
 
     def forward(self, x):
@@ -144,6 +145,23 @@ class SceneUnderstandingModule(nn.Module):
         out = self.concat_process(x6)
         return out
 
+class OrdinalRegressionLayer(nn.Module):
+    def __init__(self):
+        super(OrdinalRegressionLayer, self).__init__()
+    
+    def forward(self, x):
+        N, C, H, W = x.size()
+        ord_labels = x.clone()
+        decode_label = torch.zeros((N, 1, H, W), dtype=torch.float32)
+        ord_num = C // 2
+        for i in range(ord_num):
+            ord_i = ord_labels[:,2*i:2*(i+1),:,:]
+            ord_i = nn.functional.softmax(ord_i, dim=1)
+            ord_labels[:,2*i:2*(i+1),:,:] = ord_i
+            decode_label = decode_label + torch.argmax(ord_i, axis=1)
+        return decode_label, ord_labels
+
+
 class DORN(nn.Module):
     def __init__(self, width, height, channel):
         super(DORN, self).__init__()
@@ -151,4 +169,12 @@ class DORN(nn.Module):
         self.height = height
         self.channel = channel
         self.feature_extractor = DenseFeatureExtractor(self.channel)
+        self.aspp_module = SceneUnderstandingModule()
+        self.orl = OrdinalRegressionLayer()
+
+    def forward(self, x):
+        x1 = self.feature_extractor(x)
+        x2 = self.aspp_module(x1)
+        depth_label, ord_labels = self.orl(x2)
+        return depth_label, ord_labels
 
